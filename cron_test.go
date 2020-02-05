@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/roylee0704/gron/xtime"
+	"github.com/linxlib/gron/xtime"
 )
 
 // Most test jobs scheduled to run at 1 second mark.
@@ -65,6 +65,23 @@ func TestAddBeforeRun(t *testing.T) {
 		t.FailNow()
 	case <-done:
 	}
+}
+
+func TestEntryNextRunTimeWithBeginTime(t *testing.T) {
+	done := make(chan time.Time)
+	cron := New()
+	cron.AddFunc(Every(10*time.Second), func() { done <- time.Now() }, time.Now().Add(-time.Second*5))
+	cron.Start()
+	defer cron.Stop()
+	fmt.Println("start:", time.Now())
+
+	select {
+	case <-time.After(10 * OneSecond):
+		t.FailNow()
+	case y := <-done:
+		fmt.Println("end:", y)
+	}
+
 }
 
 // start a cron, add a job, expect it runs

@@ -1,6 +1,7 @@
 package gron
 
 import (
+	"fmt"
 	"sort"
 	"time"
 )
@@ -17,6 +18,12 @@ type Entry struct {
 	// the last time the job was run. This is zero time if the job has not been
 	// run.
 	Prev time.Time
+
+	// job begin time, default is time.Now()
+	Begin time.Time
+
+	// job name
+	Name string
 }
 
 // byTime is a handy wrapper to chronologically sort entries.
@@ -57,13 +64,15 @@ type Cron struct {
 	running bool
 	add     chan *Entry
 	stop    chan struct{}
+	debug   bool
 }
 
 // New instantiates new Cron instant c.
-func New() *Cron {
+func New(debug bool) *Cron {
 	return &Cron{
-		stop: make(chan struct{}),
-		add:  make(chan *Entry),
+		stop:  make(chan struct{}),
+		add:   make(chan *Entry),
+		debug: debug,
 	}
 }
 
@@ -77,11 +86,20 @@ func (c *Cron) Start() {
 //
 // if cron instant is not running, adding to entries is trivial.
 // otherwise, to prevent data-race, adds through channel.
-func (c *Cron) Add(s Schedule, j Job) {
+func (c *Cron) Add(n string, s Schedule, j Job, begin ...time.Time) {
 
+	var b = time.Now().Local()
+	if len(begin) >= 1 {
+		b = begin[0]
+	}
 	entry := &Entry{
 		Schedule: s,
 		Job:      j,
+		Begin:    b,
+		Name:     n,
+	}
+	if c.debug {
+		fmt.Println("add job:", n, " begin:", b.Format(time.RFC3339))
 	}
 
 	if !c.running {
@@ -92,8 +110,8 @@ func (c *Cron) Add(s Schedule, j Job) {
 }
 
 // AddFunc registers the Job function for the given Schedule.
-func (c *Cron) AddFunc(s Schedule, j func()) {
-	c.Add(s, JobFunc(j))
+func (c *Cron) AddFunc(n string, s Schedule, j func(), begin ...time.Time) {
+	c.Add(n, s, JobFunc(j), begin...)
 }
 
 // Stop halts cron instant c from running.
@@ -119,7 +137,7 @@ func (c *Cron) run() {
 
 	// to figure next trig time for entries, referenced from now
 	for _, e := range c.entries {
-		e.Next = e.Schedule.Next(now)
+		e.Next = e.Schedule.Next(e.Begin) //first time start from e.Begin
 	}
 
 	for {
@@ -139,10 +157,13 @@ func (c *Cron) run() {
 				}
 				entry.Prev = now
 				entry.Next = entry.Schedule.Next(now)
+				if c.debug {
+					fmt.Println(now.Format(time.RFC3339), " run job:", entry.Name, " next:", entry.Next.Format(time.RFC3339))
+				}
 				go entry.Job.Run()
 			}
 		case e := <-c.add:
-			e.Next = e.Schedule.Next(time.Now())
+			e.Next = e.Schedule.Next(e.Begin)
 			c.entries = append(c.entries, e)
 		case <-c.stop:
 			return // terminate go-routine.
