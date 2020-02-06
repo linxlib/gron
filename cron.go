@@ -200,6 +200,7 @@ type JobFunc struct {
 
 // Run calls j()
 func (j JobFunc) Run() {
+	j.running = true
 	j.f()
 	j.running = false
 }
