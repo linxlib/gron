@@ -51,7 +51,6 @@ func (b byTime) Less(i, j int) bool {
 // Run executes the underlying func.
 type Job interface {
 	Run()
-	IsRunning() bool
 }
 
 // Cron provides a convenient interface for scheduling job such as to clean-up
@@ -114,7 +113,7 @@ func (c *Cron) Add(n string, s Schedule, j Job, begin ...time.Time) {
 
 // AddFunc registers the Job function for the given Schedule.
 func (c *Cron) AddFunc(n string, s Schedule, j func(), begin ...time.Time) {
-	c.Add(n, s, JobFunc{j, false}, begin...)
+	c.Add(n, s, JobFunc(j), begin...)
 }
 
 // Stop halts cron instant c from running.
@@ -163,16 +162,7 @@ func (c *Cron) run() {
 				if c.debug {
 					fmt.Println(now.Format(time.RFC3339), " run job:", entry.Name, " next:", entry.Next.Format(time.RFC3339))
 				}
-				if !c.skipRunning {
-					go entry.Job.Run()
-				} else {
-					if !entry.Job.IsRunning() {
-						go entry.Job.Run()
-					} else {
-						fmt.Println("上一个任务未完成， 本次不执行")
-					}
-				}
-
+				go entry.Job.Run()
 			}
 		case e := <-c.add:
 			e.Next = e.Schedule.Next(e.Begin)
@@ -193,17 +183,9 @@ func (c Cron) Entries() []*Entry {
 // that calls f.
 //
 // todo: possibly func with params? maybe not needed.
-type JobFunc struct {
-	f       func()
-	running bool
-}
+type JobFunc func()
 
 // Run calls j()
 func (j JobFunc) Run() {
-	j.running = true
-	j.f()
-	j.running = false
-}
-func (j JobFunc) IsRunning() bool {
-	return j.running
+	j()
 }
