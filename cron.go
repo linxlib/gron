@@ -101,7 +101,8 @@ func (c *Cron) Add(n string, s Schedule, j Job, begin ...time.Time) {
 		Name:     n,
 	}
 	if c.debug {
-		fmt.Println("add job:", n, " begin:", b.Format(time.RFC3339))
+		fmt.Println("add job:", n, " begin:", b.Format(time.RFC3339), " next:", s.Next(b))
+
 	}
 
 	if !c.running {
