@@ -90,7 +90,7 @@ func (c *Cron) Start() {
 // otherwise, to prevent data-race, adds through channel.
 func (c *Cron) Add(n string, s Schedule, j Job, begin ...time.Time) {
 
-	var b = time.Now().Local()
+	var b = time.Now()
 	if len(begin) >= 1 {
 		b = begin[0]
 	}
@@ -136,7 +136,7 @@ var after = time.After
 func (c *Cron) run() {
 
 	var effective time.Time
-	now := time.Now().Local()
+	now := time.Now()
 
 	// to figure next trig time for entries, referenced from now
 	for _, e := range c.entries {
